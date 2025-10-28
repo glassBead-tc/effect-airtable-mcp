@@ -1,8 +1,22 @@
-# Airtable MCP Server
+# Effect Airtable MCP Server
 
-A Model Context Protocol server that provides tools for interacting with Airtable's API. This server enables programmatic management of Airtable bases, tables, fields, and records through Claude Desktop or other MCP clients.
+A **production-ready** Model Context Protocol server for Airtable, built with [Effect](https://effect.website/) for type-safe, composable, and robust API interactions. This server enables programmatic management of Airtable bases, tables, fields, and records through Claude Desktop or other MCP clients.
 
-This MCP server features a specialized implementation that allows it to build tables in stages, leveraging Claude's agentic capabilities and minimizing the failure rate typically seen in other MCP servers for Airtable when building complex tables. It also includes [system prompt](https://github.com/felores/airtable-mcp/blob/main/prompts/system-prompt.md) and [project knowledge](https://github.com/felores/airtable-mcp/blob/main/prompts/project-knowledge.md) markdown files to provide additional guidance for the LLM when leveraging projects in Claude Desktop.
+## Why Effect?
+
+This server leverages the Effect library to provide:
+
+- **Type Safety**: Full end-to-end type safety from input validation to output serialization
+- **Error Handling**: Structured error types with automatic validation and retries
+- **Composability**: Modular tool architecture with reusable validation pipelines
+- **Testability**: Pure functions and Effect-based testing without mocking
+- **Reliability**: Contract-driven design catches API changes at validation boundaries
+
+Unlike traditional implementations, this server features:
+- **Staged Table Creation**: Builds complex tables incrementally to minimize API failures
+- **Schema Validation**: Zod schemas ensure correctness at runtime
+- **Automatic Retries**: Effect-based retry logic for transient failures
+- **Developer Experience**: Comprehensive error messages and type inference
 
 ## Requirements: Node.js
 
@@ -41,9 +55,9 @@ This MCP server features a specialized implementation that allows it to build ta
 ```json
 {
   "mcpServers": {
-    "airtable": {
+    "airtable-effect": {
       "command": "npx",
-      "args": ["@felores/airtable-mcp-server"],
+      "args": ["@kastalien-research/effect-airtable-mcp"],
       "env": {
         "AIRTABLE_API_KEY": "your_api_key_here"
       }
@@ -53,27 +67,21 @@ This MCP server features a specialized implementation that allows it to build ta
 ```
 Note: For Windows paths, use double backslashes (\\) or forward slashes (/).
 
-### Method 2: Using mcp-installer:
-mcp-installer is a MCP server to install other MCP servers.
-1. Install [mcp-installer](https://github.com/anaisbetts/mcp-installer)
-2. Install the Airtable MCP server by prompting Claude Desktop:
-```bash
-Install @felores/airtable-mcp-server set the environment variable AIRTABLE_API_KEY to 'your_api_key'
-```
-Claude will install the server, modify the configuration file and set the environment variable AIRTABLE_API_KEY to your Airtable API key.
-
-### Method 3: Local Development Installation
-If you want to contribute or modify the code run this in your terminal:
+### Method 2: Local Development Installation
+If you want to contribute or modify the code:
 ```bash
 # Clone the repository
-git clone https://github.com/felores/airtable-mcp.git
-cd airtable-mcp
+git clone https://github.com/glassBead-tc/effect-airtable-mcp.git
+cd effect-airtable-mcp
 
 # Install dependencies
 npm install
 
 # Build the server
 npm run build
+
+# Run tests
+npm test
 
 # Run locally
 node build/index.js
@@ -82,9 +90,9 @@ Then modify the Claude Desktop configuration file to use the local installation:
 ```json
 {
   "mcpServers": {
-    "airtable": {
+    "airtable-effect": {
       "command": "node",
-      "args": ["path/to/airtable-mcp/build/index.js"],
+      "args": ["/absolute/path/to/effect-airtable-mcp/build/index.js"],
       "env": {
         "AIRTABLE_API_KEY": "your_api_key_here"
       }
@@ -101,6 +109,39 @@ Then modify the Claude Desktop configuration file to use the local installation:
 ```
 List all bases
 ```
+
+## Architecture
+
+### Effect-Based Design
+
+This server uses a **contract-driven architecture** powered by Effect:
+
+```typescript
+// Every tool follows this pattern:
+ToolExecutor {
+  1. Validate Input (Zod schema)
+  2. Execute Operation (Effect workflow)
+  3. Validate Output (Zod schema)
+  4. Check Postconditions (business rules)
+  → Return typed result or structured error
+}
+```
+
+**Key Components:**
+
+- **`ToolExecutor`**: Generic execution framework with validation pipeline
+- **`mcp-adapter`**: Bridges Effect workflows to MCP protocol
+- **Schema Modules**: Zod schemas for all inputs/outputs (bases, tables, fields, records)
+- **Tool Modules**: Pure Effect-based operations with no side effects until execution
+
+**Error Handling:**
+
+- `InputValidationError`: Invalid tool arguments
+- `OutputValidationError`: Unexpected API response (catches breaking changes)
+- `AirtableApiError`: HTTP errors with context and retry logic
+- `PostconditionError`: Business rule violations
+
+See [`src/docs/effect-architecture.md`](src/docs/effect-architecture.md) for detailed documentation.
 
 ## Features
 
@@ -144,50 +185,48 @@ Available colors for select fields:
 
 ## Contributing
 
-We welcome contributions to improve the Airtable MCP server! Here's how you can contribute:
+We welcome contributions to improve the Effect Airtable MCP server!
 
-1. Fork the Repository
-   - Visit https://github.com/felores/airtable-mcp
-   - Click the "Fork" button in the top right
-   - Clone your fork locally:
-     ```bash
-     git clone https://github.com/your-username/airtable-mcp.git
-     ```
+### Quick Start
 
-2. Create a Feature Branch
+1. Fork and clone:
+   ```bash
+   git clone https://github.com/your-username/effect-airtable-mcp.git
+   cd effect-airtable-mcp
+   npm install
+   ```
+
+2. Create a feature branch:
    ```bash
    git checkout -b feature/your-feature-name
    ```
 
-3. Make Your Changes
-   - Follow the existing code style
-   - Add tests if applicable
-   - Update documentation as needed
+3. Make your changes following Effect patterns (see `src/docs/effect-architecture.md`)
 
-4. Commit Your Changes
+4. Run tests and linting:
+   ```bash
+   npm test
+   npm run lint
+   npm run format:check
+   ```
+
+5. Commit and push:
    ```bash
    git add .
    git commit -m "feat: add your feature description"
-   ```
-
-5. Push to Your Fork
-   ```bash
    git push origin feature/your-feature-name
    ```
 
-6. Create a Pull Request
-   - Go to your fork on GitHub
-   - Click "New Pull Request"
-   - Select your feature branch
-   - Describe your changes in detail
+6. Open a Pull Request at https://github.com/glassBead-tc/effect-airtable-mcp
 
 ### Development Guidelines
 
-- Use TypeScript for new code
-- Follow semantic commit messages
-- Update documentation for new features
-- Add examples for new functionality
-- Test your changes thoroughly
+- **Use Effect patterns**: All tools use `ToolExecutor` with Zod validation
+- **Type safety**: No `any` types, strict TypeScript enabled
+- **Testing**: Write Effect-based tests (no mocking needed)
+- **Error handling**: Use structured `ToolError` types
+- **Documentation**: Update schemas and tool descriptions
+- **Commits**: Follow semantic commit messages (feat/fix/docs/refactor)
 
 ### Getting Help
 

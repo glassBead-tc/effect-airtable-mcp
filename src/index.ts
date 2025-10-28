@@ -21,6 +21,17 @@ import {
 } from "./types.js";
 import { AirtableApiError, RateLimitError } from "./errors.js";
 import { withRetry } from "./retry.js";
+import { createRecordExecutor } from "./tools/create-record.js";
+import { listBasesExecutor } from "./tools/list-bases.js";
+import { listTablesExecutor } from "./tools/list-tables.js";
+import { getRecordExecutor } from "./tools/get-record.js";
+import { listRecordsExecutor } from "./tools/list-records.js";
+import { updateTableExecutor } from "./tools/update-table.js";
+import { updateFieldExecutor } from "./tools/update-field.js";
+import { updateRecordExecutor } from "./tools/update-record.js";
+import { deleteRecordExecutor } from "./tools/delete-record.js";
+import { searchRecordsExecutor } from "./tools/search-records.js";
+import { runToolEffect } from "./adapters/mcp-adapter.js";
 
 const API_KEY = process.env.AIRTABLE_API_KEY;
 if (API_KEY === undefined || API_KEY === "") {
@@ -413,32 +424,15 @@ class AirtableServer {
       try {
         switch (request.params.name) {
           case "list_bases": {
-            const response = await withRetry(() =>
-              this.axiosInstance.get<{ bases: AirtableBase[] }>("/meta/bases")
-            );
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify(response.data.bases, null, 2),
-                },
-              ],
-            };
+            // Use Effect-based implementation with full validation
+            const executor = listBasesExecutor(this.axiosInstance);
+            return await runToolEffect(executor.execute(request.params.arguments));
           }
 
           case "list_tables": {
-            const { base_id } = request.params.arguments as { base_id: string };
-            const response = await this.axiosInstance.get<{ tables: AirtableTable[] }>(
-              `/meta/bases/${base_id}/tables`
-            );
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify(response.data.tables, null, 2),
-                },
-              ],
-            };
+            // Use Effect-based implementation with full validation
+            const executor = listTablesExecutor(this.axiosInstance);
+            return await runToolEffect(executor.execute(request.params.arguments));
           }
 
           case "create_table": {
@@ -469,29 +463,9 @@ class AirtableServer {
           }
 
           case "update_table": {
-            const { base_id, table_id, name, description } = request.params.arguments as {
-              base_id: string;
-              table_id: string;
-              name?: string;
-              description?: string;
-            };
-
-            const response = await this.axiosInstance.patch(
-              `/meta/bases/${base_id}/tables/${table_id}`,
-              {
-                name,
-                description,
-              }
-            );
-
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify(response.data, null, 2),
-                },
-              ],
-            };
+            // Use Effect-based implementation with full validation
+            const executor = updateTableExecutor(this.axiosInstance);
+            return await runToolEffect(executor.execute(request.params.arguments));
           }
 
           case "create_field": {
@@ -520,152 +494,45 @@ class AirtableServer {
           }
 
           case "update_field": {
-            const { base_id, table_id, field_id, updates } = request.params.arguments as {
-              base_id: string;
-              table_id: string;
-              field_id: string;
-              updates: Partial<FieldOption>;
-            };
-
-            const response = await this.axiosInstance.patch(
-              `/meta/bases/${base_id}/tables/${table_id}/fields/${field_id}`,
-              updates
-            );
-
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify(response.data, null, 2),
-                },
-              ],
-            };
+            // Use Effect-based implementation with full validation
+            const executor = updateFieldExecutor(this.axiosInstance);
+            return await runToolEffect(executor.execute(request.params.arguments));
           }
 
           case "list_records": {
-            const { base_id, table_name, max_records } = request.params.arguments as {
-              base_id: string;
-              table_name: string;
-              max_records?: number;
-            };
-            const response = await this.axiosInstance.get<{ records: AirtableRecord[] }>(
-              `/${base_id}/${table_name}`,
-              {
-                params:
-                  max_records !== undefined && max_records > 0
-                    ? { maxRecords: max_records }
-                    : undefined,
-              }
-            );
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify(response.data.records, null, 2),
-                },
-              ],
-            };
+            // Use Effect-based implementation with full validation
+            const executor = listRecordsExecutor(this.axiosInstance);
+            return await runToolEffect(executor.execute(request.params.arguments));
           }
 
           case "create_record": {
-            const { base_id, table_name, fields } = request.params.arguments as {
-              base_id: string;
-              table_name: string;
-              fields: Record<string, FieldValue>;
-            };
-            const response = await this.axiosInstance.post(`/${base_id}/${table_name}`, {
-              fields,
-            });
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify(response.data, null, 2),
-                },
-              ],
-            };
+            // Use Effect-based implementation with full validation
+            const executor = createRecordExecutor(this.axiosInstance);
+            return await runToolEffect(executor.execute(request.params.arguments));
           }
 
           case "update_record": {
-            const { base_id, table_name, record_id, fields } = request.params.arguments as {
-              base_id: string;
-              table_name: string;
-              record_id: string;
-              fields: Record<string, FieldValue>;
-            };
-            const response = await this.axiosInstance.patch(
-              `/${base_id}/${table_name}/${record_id}`,
-              { fields }
-            );
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify(response.data, null, 2),
-                },
-              ],
-            };
+            // Use Effect-based implementation with full validation
+            const executor = updateRecordExecutor(this.axiosInstance);
+            return await runToolEffect(executor.execute(request.params.arguments));
           }
 
           case "delete_record": {
-            const { base_id, table_name, record_id } = request.params.arguments as {
-              base_id: string;
-              table_name: string;
-              record_id: string;
-            };
-            const response = await this.axiosInstance.delete(
-              `/${base_id}/${table_name}/${record_id}`
-            );
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify(response.data, null, 2),
-                },
-              ],
-            };
+            // Use Effect-based implementation with full validation
+            const executor = deleteRecordExecutor(this.axiosInstance);
+            return await runToolEffect(executor.execute(request.params.arguments));
           }
 
           case "search_records": {
-            const { base_id, table_name, field_name, value } = request.params.arguments as {
-              base_id: string;
-              table_name: string;
-              field_name: string;
-              value: string;
-            };
-            const response = await this.axiosInstance.get<{ records: AirtableRecord[] }>(
-              `/${base_id}/${table_name}`,
-              {
-                params: {
-                  filterByFormula: `{${field_name}} = "${value}"`,
-                },
-              }
-            );
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify(response.data.records, null, 2),
-                },
-              ],
-            };
+            // Use Effect-based implementation with full validation
+            const executor = searchRecordsExecutor(this.axiosInstance);
+            return await runToolEffect(executor.execute(request.params.arguments));
           }
 
           case "get_record": {
-            const { base_id, table_name, record_id } = request.params.arguments as {
-              base_id: string;
-              table_name: string;
-              record_id: string;
-            };
-            const response = await this.axiosInstance.get(`/${base_id}/${table_name}/${record_id}`);
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify(response.data, null, 2),
-                },
-              ],
-            };
+            // Use Effect-based implementation with full validation
+            const executor = getRecordExecutor(this.axiosInstance);
+            return await runToolEffect(executor.execute(request.params.arguments));
           }
 
           default:
