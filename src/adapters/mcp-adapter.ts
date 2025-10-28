@@ -38,7 +38,9 @@ interface MCPToolResponse {
 function mapToolErrorToMcpError(error: ToolError): McpError {
   switch (error._tag) {
     case "InputValidationError": {
-      const issueMessages = error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`);
+      const issueMessages = error.issues.map(
+        (issue) => `${issue.path.join(".")}: ${issue.message}`
+      );
       return new McpError(
         ErrorCode.InvalidParams,
         `Input validation failed for ${error.toolName}: ${issueMessages.join(", ")}`,
@@ -51,7 +53,9 @@ function mapToolErrorToMcpError(error: ToolError): McpError {
     }
 
     case "OutputValidationError": {
-      const issueMessages = error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`);
+      const issueMessages = error.issues.map(
+        (issue) => `${issue.path.join(".")}: ${issue.message}`
+      );
       return new McpError(
         ErrorCode.InternalError,
         `Output validation failed for ${error.toolName}: ${issueMessages.join(", ")}. This may indicate an API schema change.`,

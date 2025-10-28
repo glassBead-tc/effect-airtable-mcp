@@ -1,12 +1,16 @@
 import { Effect } from "effect";
 import axios, { AxiosInstance } from "axios";
-import { ListBasesInputSchema, ListBasesOutputSchema, type ListBasesOutput } from "../schemas/index.js";
+import {
+  ListBasesInputSchema,
+  ListBasesOutputSchema,
+  type ListBasesOutput,
+} from "../schemas/index.js";
 import { ToolExecutor } from "../execution/tool-executor.js";
 import { AirtableApiError } from "../errors/tool-errors.js";
 
 /**
  * List Bases Tool - Contract-driven implementation
- * 
+ *
  * Lists all Airtable bases the authenticated user has access to.
  * This is a read-only operation with no postconditions.
  */
@@ -42,11 +46,9 @@ function callAirtableApi(
 /**
  * Create and configure the ToolExecutor for list_bases
  */
-export function listBasesExecutor(axiosInstance: AxiosInstance): ToolExecutor<
-  Record<string, never>,
-  ListBasesOutput,
-  AirtableApiError
-> {
+export function listBasesExecutor(
+  axiosInstance: AxiosInstance
+): ToolExecutor<Record<string, never>, ListBasesOutput, AirtableApiError> {
   return new ToolExecutor({
     name: "list_bases",
     inputSchema: ListBasesInputSchema,

@@ -11,7 +11,7 @@ import { AirtableApiError } from "../errors/tool-errors.js";
 
 /**
  * Update Table Tool - Contract-driven implementation
- * 
+ *
  * Updates table metadata (name and/or description) in an Airtable base.
  * Returns the updated table structure with all fields and views.
  */
@@ -58,11 +58,9 @@ function callAirtableApi(
 /**
  * Create and configure the ToolExecutor for update_table
  */
-export function updateTableExecutor(axiosInstance: AxiosInstance): ToolExecutor<
-  UpdateTableInput,
-  UpdateTableOutput,
-  AirtableApiError
-> {
+export function updateTableExecutor(
+  axiosInstance: AxiosInstance
+): ToolExecutor<UpdateTableInput, UpdateTableOutput, AirtableApiError> {
   return new ToolExecutor({
     name: "update_table",
     inputSchema: UpdateTableInputSchema,

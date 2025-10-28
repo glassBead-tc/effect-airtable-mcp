@@ -11,7 +11,7 @@ import { AirtableApiError } from "../errors/tool-errors.js";
 
 /**
  * Get Record Tool - Contract-driven implementation
- * 
+ *
  * Retrieves a single record by ID from an Airtable table.
  * This is a read-only operation with no postconditions.
  */
@@ -25,7 +25,9 @@ function callAirtableApi(
   return (input: GetRecordInput) =>
     Effect.tryPromise({
       try: async () => {
-        const response = await axiosInstance.get(`/${input.base_id}/${input.table_name}/${input.record_id}`);
+        const response = await axiosInstance.get(
+          `/${input.base_id}/${input.table_name}/${input.record_id}`
+        );
         return response.data;
       },
       catch: (error) => {
@@ -52,11 +54,9 @@ function callAirtableApi(
 /**
  * Create and configure the ToolExecutor for get_record
  */
-export function getRecordExecutor(axiosInstance: AxiosInstance): ToolExecutor<
-  GetRecordInput,
-  GetRecordOutput,
-  AirtableApiError
-> {
+export function getRecordExecutor(
+  axiosInstance: AxiosInstance
+): ToolExecutor<GetRecordInput, GetRecordOutput, AirtableApiError> {
   return new ToolExecutor({
     name: "get_record",
     inputSchema: GetRecordInputSchema,

@@ -57,9 +57,7 @@ export const PercentFieldOptionsSchema = z.object({
 
 export const DateFieldOptionsSchema = z.object({
   dateFormat: z.object({
-    name: z
-      .enum(["local", "friendly", "us", "european", "iso"])
-      .describe("Date format style"),
+    name: z.enum(["local", "friendly", "us", "european", "iso"]).describe("Date format style"),
     format: z.string().optional().describe("Custom format string"),
   }),
   timeZone: z.string().optional().describe("IANA timezone identifier"),

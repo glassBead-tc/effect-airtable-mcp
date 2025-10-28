@@ -98,9 +98,12 @@ export class ToolExecutor<I, O, E extends ToolError = ToolError> {
 
     // Run all postconditions in sequence
     return pipe(
-      Effect.all(this.config.postconditions.map((check) => check(output)), {
-        concurrency: "unbounded",
-      }),
+      Effect.all(
+        this.config.postconditions.map((check) => check(output)),
+        {
+          concurrency: "unbounded",
+        }
+      ),
       Effect.map(() => void 0)
     );
   }

@@ -22,7 +22,12 @@ export const RecordIdSchema = z
 export const ListRecordsInputSchema = z.object({
   base_id: z.string().describe("Base ID"),
   table_name: z.string().describe("Table name or ID"),
-  max_records: z.number().int().positive().optional().describe("Maximum number of records to return"),
+  max_records: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe("Maximum number of records to return"),
   view: z.string().optional().describe("View name or ID to filter by"),
   fields: z.array(z.string()).optional().describe("Specific fields to return"),
   filter_by_formula: z.string().optional().describe("Airtable formula to filter records"),

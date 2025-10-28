@@ -11,7 +11,7 @@ import { AirtableApiError } from "../errors/tool-errors.js";
 
 /**
  * List Tables Tool - Contract-driven implementation
- * 
+ *
  * Lists all tables in a specified Airtable base.
  * This is a read-only operation with no postconditions.
  */
@@ -50,11 +50,9 @@ function callAirtableApi(
 /**
  * Create and configure the ToolExecutor for list_tables
  */
-export function listTablesExecutor(axiosInstance: AxiosInstance): ToolExecutor<
-  ListTablesInput,
-  ListTablesOutput,
-  AirtableApiError
-> {
+export function listTablesExecutor(
+  axiosInstance: AxiosInstance
+): ToolExecutor<ListTablesInput, ListTablesOutput, AirtableApiError> {
   return new ToolExecutor({
     name: "list_tables",
     inputSchema: ListTablesInputSchema,

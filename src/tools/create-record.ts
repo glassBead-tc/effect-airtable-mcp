@@ -76,11 +76,9 @@ function checkRecordExists(output: CreateRecordOutput): Effect.Effect<void, Post
  * @param axiosInstance - Configured Axios instance for Airtable API
  * @returns Configured ToolExecutor ready for execution
  */
-export function createRecordExecutor(axiosInstance: AxiosInstance): ToolExecutor<
-  CreateRecordInput,
-  CreateRecordOutput,
-  AirtableApiError
-> {
+export function createRecordExecutor(
+  axiosInstance: AxiosInstance
+): ToolExecutor<CreateRecordInput, CreateRecordOutput, AirtableApiError> {
   return new ToolExecutor({
     name: "create_record",
     inputSchema: CreateRecordInputSchema,

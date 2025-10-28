@@ -1,10 +1,10 @@
 /**
  * Schemas - Centralized Zod schema exports
- * 
+ *
  * This module provides runtime-validated schemas and TypeScript types
  * for all Airtable API operations. Schemas serve as the authoritative
  * contracts between the API and our application.
- * 
+ *
  * Organization:
  * - bases.ts: Base entities and operations
  * - tables.ts: Table entities, views, and operations

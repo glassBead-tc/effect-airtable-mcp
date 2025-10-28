@@ -1,5 +1,6 @@
-# Source
+# Source (but keep docs)
 src/
+!src/docs/
 
 # Development files
 .git/
@@ -11,19 +12,36 @@ src/
 
 # Test files
 test/
+tests/
 __tests__/
 *.test.ts
 *.spec.ts
+vitest.config.ts
 
 # Configuration files
 tsconfig.json
 .eslintrc*
 .prettierrc*
 
-# Documentation
+# Documentation (keep README and src/docs)
 docs/
+prompts/
 *.md
 !README.md
+!src/docs/*.md
 
 # Build artifacts
-*.tsbuildinfo 
+*.tsbuildinfo
+
+# Development-only files
+.husky/
+.eslintrc*
+eslint.config.*
+.prettierignore
+tsconfig.build.json
+WARP.md
+TODO.md
+IMPLEMENTATION.md
+AIRTABLE_API_UPDATE_SPEC.md
+.DS_Store
+.claude/

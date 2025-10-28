@@ -11,7 +11,7 @@ import { AirtableApiError } from "../errors/tool-errors.js";
 
 /**
  * Delete Record Tool - Contract-driven implementation
- * 
+ *
  * Deletes a record from an Airtable table.
  * Returns confirmation of deletion with the deleted record ID.
  */
@@ -54,11 +54,9 @@ function callAirtableApi(
 /**
  * Create and configure the ToolExecutor for delete_record
  */
-export function deleteRecordExecutor(axiosInstance: AxiosInstance): ToolExecutor<
-  DeleteRecordInput,
-  DeleteRecordOutput,
-  AirtableApiError
-> {
+export function deleteRecordExecutor(
+  axiosInstance: AxiosInstance
+): ToolExecutor<DeleteRecordInput, DeleteRecordOutput, AirtableApiError> {
   return new ToolExecutor({
     name: "delete_record",
     inputSchema: DeleteRecordInputSchema,

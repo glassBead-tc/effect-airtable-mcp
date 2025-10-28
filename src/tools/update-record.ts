@@ -11,7 +11,7 @@ import { AirtableApiError } from "../errors/tool-errors.js";
 
 /**
  * Update Record Tool - Contract-driven implementation
- * 
+ *
  * Updates an existing record in an Airtable table.
  * Returns the updated record with all fields.
  */
@@ -58,11 +58,9 @@ function callAirtableApi(
 /**
  * Create and configure the ToolExecutor for update_record
  */
-export function updateRecordExecutor(axiosInstance: AxiosInstance): ToolExecutor<
-  UpdateRecordInput,
-  UpdateRecordOutput,
-  AirtableApiError
-> {
+export function updateRecordExecutor(
+  axiosInstance: AxiosInstance
+): ToolExecutor<UpdateRecordInput, UpdateRecordOutput, AirtableApiError> {
   return new ToolExecutor({
     name: "update_record",
     inputSchema: UpdateRecordInputSchema,

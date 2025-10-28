@@ -11,7 +11,7 @@ import { AirtableApiError } from "../errors/tool-errors.js";
 
 /**
  * Search Records Tool - Contract-driven implementation
- * 
+ *
  * Searches for records in an Airtable table using a filter formula.
  * Returns matching records.
  */
@@ -56,11 +56,9 @@ function callAirtableApi(
 /**
  * Create and configure the ToolExecutor for search_records
  */
-export function searchRecordsExecutor(axiosInstance: AxiosInstance): ToolExecutor<
-  SearchRecordsInput,
-  SearchRecordsOutput,
-  AirtableApiError
-> {
+export function searchRecordsExecutor(
+  axiosInstance: AxiosInstance
+): ToolExecutor<SearchRecordsInput, SearchRecordsOutput, AirtableApiError> {
   return new ToolExecutor({
     name: "search_records",
     inputSchema: SearchRecordsInputSchema,

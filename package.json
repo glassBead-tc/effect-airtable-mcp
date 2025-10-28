@@ -8,7 +8,8 @@
   },
   "files": [
     "build",
-    "scripts"
+    "scripts",
+    "src/docs"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node scripts/post-build.js",
@@ -60,8 +61,19 @@
     "mcp",
     "model-context-protocol",
     "claude",
-    "api"
+    "api",
+    "effect",
+    "effect-ts",
+    "typescript",
+    "zod",
+    "type-safe",
+    "validation",
+    "schema"
   ],
+  "homepage": "https://github.com/glassBead-tc/effect-airtable-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/glassBead-tc/effect-airtable-mcp/issues"
+  },
   "engines": {
     "node": ">=16.0.0"
   },

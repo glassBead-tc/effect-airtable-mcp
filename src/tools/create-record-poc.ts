@@ -10,13 +10,13 @@ import {
 
 /**
  * Proof of Concept: Contract-Driven Tool Execution
- * 
+ *
  * This demonstrates the full stack for create_record operation:
  * 1. Runtime input validation with Zod
  * 2. Effect-TS workflow with typed errors
  * 3. Output validation before returning to model
  * 4. Type safety from input → API → output
- * 
+ *
  * Pattern can be generalized to all tools via ToolExecutor abstraction.
  */
 
@@ -62,9 +62,7 @@ type CreateRecordError =
 /**
  * Validate input against Zod schema
  */
-const validateInput = (
-  rawInput: unknown
-): Effect.Effect<CreateRecordInput, InputValidationError> =>
+const validateInput = (rawInput: unknown): Effect.Effect<CreateRecordInput, InputValidationError> =>
   Effect.try({
     try: () => CreateRecordInputSchema.parse(rawInput),
     catch: (error) =>
@@ -103,13 +101,10 @@ const callAirtableApi =
   (input: CreateRecordInput): Effect.Effect<unknown, AirtableApiError> =>
     Effect.tryPromise({
       try: async () => {
-        const response = await axiosInstance.post(
-          `/${input.base_id}/${input.table_name}`,
-          {
-            fields: input.fields,
-            typecast: input.typecast,
-          }
-        );
+        const response = await axiosInstance.post(`/${input.base_id}/${input.table_name}`, {
+          fields: input.fields,
+          typecast: input.typecast,
+        });
         return response.data;
       },
       catch: (error) => {
@@ -159,14 +154,14 @@ const checkPostconditions = (
 
 /**
  * Execute create_record with full contract validation
- * 
+ *
  * Flow:
  * 1. Validate raw input → CreateRecordInput
  * 2. Call Airtable API
  * 3. Validate raw output → CreateRecordOutput
  * 4. Check postconditions (record exists)
  * 5. Return typed result
- * 
+ *
  * @param rawInput - Unvalidated input from MCP tool call
  * @param axiosInstance - Configured Axios instance for Airtable API
  * @returns Effect that produces validated output or typed error
