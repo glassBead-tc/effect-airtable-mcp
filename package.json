@@ -4,7 +4,7 @@
   "description": "Effect-based Airtable Model Context Protocol Server",
   "type": "module",
   "bin": {
-    "airtable-server": "build/index.js"
+    "airtable-server": "build/server.js"
   },
   "files": [
     "build",
@@ -12,10 +12,12 @@
     "src/docs"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && node scripts/post-build.js",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node build/server.js",
+    "dev": "tsx src/server.ts",
     "prepare": "husky",
     "watch": "tsc --watch",
-    "inspector": "npx @modelcontextprotocol/inspector build/index.js",
+    "inspector": "npx @modelcontextprotocol/inspector --transport http http://127.0.0.1:3000/mcp",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write \"src/**/*.ts\"",
