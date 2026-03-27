@@ -42,6 +42,18 @@ export const ListRecordsInputSchema = z.object({
     .describe("Sort configuration"),
   page_size: z.number().int().min(1).max(100).optional().describe("Number of records per page"),
   offset: z.string().optional().describe("Pagination offset token"),
+  cell_format: z
+    .enum(["json", "string"])
+    .optional()
+    .describe("Response format for cell values: 'json' (default) or 'string'"),
+  time_zone: z
+    .string()
+    .optional()
+    .describe("Time zone for 'string' cell format (e.g., 'America/New_York')"),
+  user_locale: z
+    .string()
+    .optional()
+    .describe("User locale for 'string' cell format (e.g., 'en-us')"),
 });
 
 export const CreateRecordInputSchema = z.object({
@@ -99,6 +111,80 @@ export const DeleteRecordOutputSchema = z.object({
   deleted: z.boolean(),
   id: z.string(),
 });
+
+// Batch create
+export const CreateRecordsInputSchema = z.object({
+  base_id: z.string().describe("Base ID"),
+  table_name: z.string().describe("Table name or ID"),
+  records: z
+    .array(
+      z.object({
+        fields: z.record(z.string(), FieldValueSchema).describe("Record field values"),
+      })
+    )
+    .min(1)
+    .max(10)
+    .describe("Array of records to create (1-10)"),
+  typecast: z.boolean().optional().default(false).describe("Automatically convert field values"),
+});
+
+export const CreateRecordsOutputSchema = z.object({
+  records: z.array(RecordSchema),
+});
+
+// Batch update (with upsert)
+export const UpdateRecordsInputSchema = z.object({
+  base_id: z.string().describe("Base ID"),
+  table_name: z.string().describe("Table name or ID"),
+  records: z
+    .array(
+      z.object({
+        id: z.string().optional().describe("Record ID (required for update, omit for upsert)"),
+        fields: z.record(z.string(), FieldValueSchema).describe("Fields to update"),
+      })
+    )
+    .min(1)
+    .max(10)
+    .describe("Array of records to update (1-10)"),
+  perform_upsert: z
+    .object({
+      fields_to_merge_on: z
+        .array(z.string())
+        .min(1)
+        .max(3)
+        .describe("Field names to match on for upsert"),
+    })
+    .optional()
+    .describe("If set, performs upsert instead of update"),
+  typecast: z.boolean().optional().default(false).describe("Automatically convert field values"),
+});
+
+export const UpdateRecordsOutputSchema = z.object({
+  records: z.array(RecordSchema),
+});
+
+// Batch delete
+export const DeleteRecordsInputSchema = z.object({
+  base_id: z.string().describe("Base ID"),
+  table_name: z.string().describe("Table name or ID"),
+  record_ids: z.array(z.string()).min(1).max(10).describe("Array of record IDs to delete (1-10)"),
+});
+
+export const DeleteRecordsOutputSchema = z.object({
+  records: z.array(
+    z.object({
+      id: z.string(),
+      deleted: z.boolean(),
+    })
+  ),
+});
+
+export type CreateRecordsInput = z.infer<typeof CreateRecordsInputSchema>;
+export type CreateRecordsOutput = z.infer<typeof CreateRecordsOutputSchema>;
+export type UpdateRecordsInput = z.infer<typeof UpdateRecordsInputSchema>;
+export type UpdateRecordsOutput = z.infer<typeof UpdateRecordsOutputSchema>;
+export type DeleteRecordsInput = z.infer<typeof DeleteRecordsInputSchema>;
+export type DeleteRecordsOutput = z.infer<typeof DeleteRecordsOutputSchema>;
 
 // Derived TypeScript types
 export type Record = z.infer<typeof RecordSchema>;
