@@ -1,51 +1,5 @@
 // Field type definitions for Airtable
 
-// Valid field values for Airtable records
-export type FieldValue = string | number | boolean | string[] | null | undefined;
-
-// Airtable API response types
-export interface AirtableBase {
-  id: string;
-  name: string;
-  permissionLevel: string;
-}
-
-export interface AirtableTable {
-  id: string;
-  name: string;
-  description?: string;
-  primaryFieldId: string;
-  fields: AirtableField[];
-  views: AirtableView[];
-}
-
-export interface AirtableField {
-  id: string;
-  name: string;
-  type: string;
-  description?: string;
-  options?: FieldOptions;
-}
-
-export interface AirtableView {
-  id: string;
-  name: string;
-  type: string;
-}
-
-export interface AirtableRecord {
-  id: string;
-  createdTime: string;
-  fields: Record<string, FieldValue>;
-}
-
-export interface AirtableError {
-  error?: {
-    type: string;
-    message: string;
-  };
-}
-
 export type FieldType =
   | "singleLineText"
   | "multilineText"
