@@ -19,11 +19,14 @@ export const BaseIdSchema = z
   .regex(/^app[a-zA-Z0-9]{14}$/, "Base ID must be in format 'appXXXXXXXXXXXXXX'");
 
 // Tool input schemas
-export const ListBasesInputSchema = z.object({}).describe("No parameters required");
+export const ListBasesInputSchema = z.object({
+  offset: z.string().optional().describe("Pagination token for the next page"),
+});
 
 // Tool output schemas
 export const ListBasesOutputSchema = z.object({
   bases: z.array(BaseSchema),
+  offset: z.string().optional().describe("Pagination token for the next page"),
 });
 
 // Derived TypeScript types

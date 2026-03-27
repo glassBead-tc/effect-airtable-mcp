@@ -4,7 +4,7 @@
   "description": "Effect-based Airtable Model Context Protocol Server",
   "type": "module",
   "bin": {
-    "airtable-server": "build/index.js"
+    "airtable-server": "build/server.js"
   },
   "files": [
     "build",
@@ -12,10 +12,12 @@
     "src/docs"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && node scripts/post-build.js",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node build/server.js",
+    "dev": "tsx src/server.ts",
     "prepare": "husky",
     "watch": "tsc --watch",
-    "inspector": "npx @modelcontextprotocol/inspector build/index.js",
+    "inspector": "npx @modelcontextprotocol/inspector --transport http http://127.0.0.1:3000/mcp",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write \"src/**/*.ts\"",
@@ -26,15 +28,15 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@effect/schema": "^0.75.5",
-    "@modelcontextprotocol/sdk": "0.6.0",
+    "@modelcontextprotocol/sdk": "1.28.0",
     "axios": "^1.7.9",
-    "effect": "^3.18.4",
+    "express": "^4.21.2",
     "zod": "^4.1.12"
   },
   "devDependencies": {
     "@eslint/js": "^9.27.0",
-    "@types/node": "^20.11.24",
+    "@types/express": "^5.0.2",
+    "@types/node": "^22.15.0",
     "@typescript-eslint/eslint-plugin": "^8.32.1",
     "@typescript-eslint/parser": "^8.32.1",
     "@vitest/coverage-v8": "^3.1.4",
@@ -75,7 +77,7 @@
     "url": "https://github.com/glassBead-tc/effect-airtable-mcp/issues"
   },
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=22.0.0"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
