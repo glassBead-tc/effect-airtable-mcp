@@ -63,9 +63,17 @@ export function startHttpReceiver(
     res.json({ status: "ok", server: "airtable-effect-channel" });
   });
 
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const server = app.listen(config.port, "127.0.0.1", () => {
+      // Startup succeeded: later errors should be logged, not crash the process.
+      server.off("error", reject);
+      server.on("error", (error) => {
+        log(`http receiver error: ${error.message}`);
+      });
       resolve(server);
     });
+    // Without this, a listen failure (e.g. EADDRINUSE from a stale channel
+    // instance) is an unhandled 'error' event that kills the whole channel.
+    server.on("error", reject);
   });
 }

@@ -18,6 +18,7 @@
  *
  * IMPORTANT: stdout belongs to the stdio transport. All logging goes to stderr.
  */
+import type { Server } from "node:http";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -83,8 +84,25 @@ async function main(): Promise<void> {
     });
   };
 
-  const httpServer = await startHttpReceiver({ port: HTTP_PORT, token: HTTP_TOKEN }, push, log);
-  log(`event receiver listening on http://127.0.0.1:${HTTP_PORT}/event`);
+  // The receiver is a secondary event source — if it cannot start (typically
+  // EADDRINUSE from a stale channel instance still holding the port), keep the
+  // stdio channel and the webhook poller alive rather than dying with an
+  // opaque connection error.
+  let httpServer: Server | undefined;
+  try {
+    httpServer = await startHttpReceiver({ port: HTTP_PORT, token: HTTP_TOKEN }, push, log);
+    log(`event receiver listening on http://127.0.0.1:${HTTP_PORT}/event`);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    const detail =
+      code === "EADDRINUSE"
+        ? `port ${HTTP_PORT} is already in use — likely a stale channel instance ` +
+          `(lsof -iTCP:${HTTP_PORT} -sTCP:LISTEN to find it; kill it and reconnect to restore the receiver)`
+        : error instanceof Error
+          ? error.message
+          : String(error);
+    log(`HTTP event receiver disabled: ${detail}. Webhook polling is unaffected.`);
+  }
 
   let poller: { stop: () => void } | undefined;
   const baseId = process.env.AIRTABLE_WEBHOOK_BASE_ID;
@@ -113,12 +131,17 @@ async function main(): Promise<void> {
 
   const shutdown = (): void => {
     poller?.stop();
-    httpServer.close(() => {
+    const disposeAndExit = (): void => {
       runtime.dispose().then(
         () => process.exit(0),
         () => process.exit(1)
       );
-    });
+    };
+    if (httpServer !== undefined) {
+      httpServer.close(disposeAndExit);
+    } else {
+      disposeAndExit();
+    }
   };
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);

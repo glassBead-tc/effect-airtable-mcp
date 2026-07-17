@@ -92,6 +92,19 @@ describe("http receiver", () => {
     expect(res.status).toBe(503);
   });
 
+  it("rejects (instead of crashing) when the port is already in use", async () => {
+    const push = vi.fn().mockResolvedValue(undefined);
+    const url = await start(push);
+    const { port } = server!.address() as AddressInfo;
+
+    await expect(startHttpReceiver({ port }, push, () => {})).rejects.toMatchObject({
+      code: "EADDRINUSE",
+    });
+    // The first receiver must be unaffected by the failed second bind.
+    const res = await fetch(`${url}/health`);
+    expect(res.status).toBe(200);
+  });
+
   it("a sender cannot override the origin attribute", async () => {
     const push = vi.fn().mockResolvedValue(undefined);
     const url = await start(push);
