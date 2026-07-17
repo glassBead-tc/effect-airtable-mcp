@@ -95,4 +95,71 @@ describe("operations catalog", () => {
       performUpsert: { fieldsToMergeOn: ["Name"] },
     });
   });
+
+  // Regression: validateField used to rebuild fields whose type fell outside a
+  // 5-type whitelist, silently dropping caller-provided options — Airtable then
+  // 422'd on dateTime/multipleRecordLinks fields it never saw options for.
+  it("create_table forwards options verbatim for types outside the defaults whitelist", async () => {
+    const client = makeStubClient();
+    const catalog = createOperationsCatalog(client);
+    const createTable = catalog.find((op) => op.name === "create_table");
+
+    const linkOptions = { linkedTableId: "tblXYZ" };
+    const dateTimeOptions = {
+      dateFormat: { name: "iso" },
+      timeFormat: { name: "24hour" },
+      timeZone: "utc",
+    };
+    await Effect.runPromise(
+      createTable!.handler({
+        base_id: "app1",
+        table_name: "Runs",
+        fields: [
+          { name: "Request", type: "multipleRecordLinks", options: linkOptions },
+          { name: "Started At", type: "dateTime", options: dateTimeOptions },
+        ],
+      })
+    );
+    expect(client.createTable).toHaveBeenCalledWith("app1", {
+      name: "Runs",
+      description: undefined,
+      fields: [
+        { name: "Request", type: "multipleRecordLinks", options: linkOptions },
+        { name: "Started At", type: "dateTime", options: dateTimeOptions },
+      ],
+    });
+  });
+
+  it("create_field forwards provided options and only fills defaults when missing", async () => {
+    const client = makeStubClient();
+    const catalog = createOperationsCatalog(client);
+    const createField = catalog.find((op) => op.name === "create_field");
+
+    const linkOptions = { linkedTableId: "tblXYZ" };
+    await Effect.runPromise(
+      createField!.handler({
+        base_id: "app1",
+        table_id: "tbl1",
+        name: "Request",
+        type: "multipleRecordLinks",
+        options: linkOptions,
+      })
+    );
+    expect(client.createField).toHaveBeenCalledWith("app1", "tbl1", {
+      name: "Request",
+      type: "multipleRecordLinks",
+      description: undefined,
+      options: linkOptions,
+    });
+
+    await Effect.runPromise(
+      createField!.handler({ base_id: "app1", table_id: "tbl1", name: "N", type: "number" })
+    );
+    expect(client.createField).toHaveBeenLastCalledWith("app1", "tbl1", {
+      name: "N",
+      type: "number",
+      description: undefined,
+      options: { precision: 0 },
+    });
+  });
 });

@@ -27,13 +27,14 @@ function p(name: string, type: string, required: boolean, description: string): 
   return { name, type, required, description };
 }
 
+// Fill missing options with known defaults; NEVER strip provided ones.
+// (The old version rebuilt fields for types outside a 5-type whitelist,
+// silently dropping options for dateTime/multipleRecordLinks/etc. — Airtable
+// then 422'd on fields it never saw the options for. Airtable is the
+// authority on which options are valid; this server just forwards.)
 function validateField(field: FieldOption): FieldOption {
-  const { type } = field;
-  if (!fieldRequiresOptions(type)) {
-    return { name: field.name, type: field.type, description: field.description };
-  }
-  if (!field.options) {
-    return { ...field, options: getDefaultOptions(type) };
+  if (!field.options && fieldRequiresOptions(field.type)) {
+    return { ...field, options: getDefaultOptions(field.type) };
   }
   return field;
 }
