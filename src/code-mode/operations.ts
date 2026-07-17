@@ -1,5 +1,6 @@
-import { AxiosError, type AxiosInstance } from "axios";
-import { AirtableApiError } from "../airtable-client.js";
+import type { Effect } from "effect";
+import type { AirtableClient, ListRecordsOptions, SortSpec } from "../airtable-client.js";
+import type { AirtableError } from "../errors.js";
 import { fieldRequiresOptions, getDefaultOptions, type FieldOption } from "../types.js";
 
 export interface OperationParam {
@@ -13,7 +14,7 @@ export interface Operation {
   name: string;
   description: string;
   parameters: OperationParam[];
-  handler: (params: Record<string, unknown>) => Promise<unknown>;
+  handler: (params: Record<string, unknown>) => Effect.Effect<unknown, AirtableError>;
 }
 
 export interface SearchResult {
@@ -41,48 +42,25 @@ function str(v: unknown): string {
   return v as string;
 }
 
-export function createOperationsCatalog(client: AxiosInstance): Operation[] {
+export function createOperationsCatalog(client: AirtableClient): Operation[] {
   return [
     {
       name: "list_bases",
       description: "List all accessible Airtable bases. Returns up to 1000 bases per page.",
       parameters: [p("offset", "string", false, "Pagination offset from a previous response")],
-      handler: async (params): Promise<unknown> => {
-        try {
-          const qp: Record<string, string> = {};
-          if (params["offset"] !== undefined) qp["offset"] = str(params["offset"]);
-          const response = await client.get("/meta/bases", { params: qp });
-          return response.data as unknown;
-        } catch (error) {
-          throw new AirtableApiError(error as AxiosError);
-        }
-      },
+      handler: (params) => client.listBases({ offset: params["offset"] as string | undefined }),
     },
     {
       name: "get_base",
       description: "Get schema details for a single Airtable base",
       parameters: [p("base_id", "string", true, "ID of the base")],
-      handler: async (params): Promise<unknown> => {
-        try {
-          const response = await client.get(`/meta/bases/${str(params["base_id"])}`);
-          return response.data as unknown;
-        } catch (error) {
-          throw new AirtableApiError(error as AxiosError);
-        }
-      },
+      handler: (params) => client.getBase(str(params["base_id"])),
     },
     {
       name: "list_tables",
       description: "List all tables and their schemas in a base",
       parameters: [p("base_id", "string", true, "ID of the base")],
-      handler: async (params): Promise<unknown> => {
-        try {
-          const response = await client.get(`/meta/bases/${str(params["base_id"])}/tables`);
-          return response.data as unknown;
-        } catch (error) {
-          throw new AirtableApiError(error as AxiosError);
-        }
-      },
+      handler: (params) => client.listTables(str(params["base_id"])),
     },
     {
       name: "create_table",
@@ -93,19 +71,13 @@ export function createOperationsCatalog(client: AxiosInstance): Operation[] {
         p("description", "string", false, "Description of the table"),
         p("fields", "array", false, "Initial fields for the table"),
       ],
-      handler: async (params): Promise<unknown> => {
-        try {
-          const rawFields = params["fields"] as FieldOption[] | undefined;
-          const validatedFields = rawFields?.map((f) => validateField(f));
-          const response = await client.post(`/meta/bases/${str(params["base_id"])}/tables`, {
-            name: params["table_name"],
-            description: params["description"],
-            fields: validatedFields,
-          });
-          return response.data as unknown;
-        } catch (error) {
-          throw new AirtableApiError(error as AxiosError);
-        }
+      handler: (params): Effect.Effect<unknown, AirtableError> => {
+        const rawFields = params["fields"] as FieldOption[] | undefined;
+        return client.createTable(str(params["base_id"]), {
+          name: params["table_name"],
+          description: params["description"],
+          fields: rawFields?.map((f) => validateField(f)),
+        });
       },
     },
     {
@@ -117,19 +89,11 @@ export function createOperationsCatalog(client: AxiosInstance): Operation[] {
         p("name", "string", false, "New name for the table"),
         p("description", "string", false, "New description for the table"),
       ],
-      handler: async (params): Promise<unknown> => {
-        try {
-          const body: Record<string, string> = {};
-          if (params["name"] !== undefined) body["name"] = str(params["name"]);
-          if (params["description"] !== undefined) body["description"] = str(params["description"]);
-          const response = await client.patch(
-            `/meta/bases/${str(params["base_id"])}/tables/${str(params["table_id"])}`,
-            body
-          );
-          return response.data as unknown;
-        } catch (error) {
-          throw new AirtableApiError(error as AxiosError);
-        }
+      handler: (params): Effect.Effect<unknown, AirtableError> => {
+        const body: Record<string, string> = {};
+        if (params["name"] !== undefined) body["name"] = str(params["name"]);
+        if (params["description"] !== undefined) body["description"] = str(params["description"]);
+        return client.updateTable(str(params["base_id"]), str(params["table_id"]), body);
       },
     },
     {
@@ -143,23 +107,17 @@ export function createOperationsCatalog(client: AxiosInstance): Operation[] {
         p("description", "string", false, "Description of the field"),
         p("options", "object", false, "Field-type-specific options"),
       ],
-      handler: async (params): Promise<unknown> => {
-        try {
-          const field = validateField({
+      handler: (params) =>
+        client.createField(
+          str(params["base_id"]),
+          str(params["table_id"]),
+          validateField({
             name: str(params["name"]),
             type: str(params["type"]) as FieldOption["type"],
             description: params["description"] as string | undefined,
             options: params["options"] as FieldOption["options"],
-          });
-          const response = await client.post(
-            `/meta/bases/${str(params["base_id"])}/tables/${str(params["table_id"])}/fields`,
-            field
-          );
-          return response.data as unknown;
-        } catch (error) {
-          throw new AirtableApiError(error as AxiosError);
-        }
-      },
+          })
+        ),
     },
     {
       name: "update_field",
@@ -170,17 +128,13 @@ export function createOperationsCatalog(client: AxiosInstance): Operation[] {
         p("field_id", "string", true, "ID of the field to update"),
         p("updates", "object", true, "Fields to update (name, description, options)"),
       ],
-      handler: async (params): Promise<unknown> => {
-        try {
-          const response = await client.patch(
-            `/meta/bases/${str(params["base_id"])}/tables/${str(params["table_id"])}/fields/${str(params["field_id"])}`,
-            params["updates"]
-          );
-          return response.data as unknown;
-        } catch (error) {
-          throw new AirtableApiError(error as AxiosError);
-        }
-      },
+      handler: (params) =>
+        client.updateField(
+          str(params["base_id"]),
+          str(params["table_id"]),
+          str(params["field_id"]),
+          params["updates"]
+        ),
     },
     {
       name: "list_records",
@@ -200,39 +154,20 @@ export function createOperationsCatalog(client: AxiosInstance): Operation[] {
         p("fields", "array", false, "Field names or IDs to include"),
         p("sort", "array", false, "Sort configuration [{field, direction}]"),
       ],
-      handler: async (params): Promise<unknown> => {
-        try {
-          const qp: Record<string, unknown> = {};
-          if (params["max_records"] !== undefined) qp["maxRecords"] = params["max_records"];
-          if (params["page_size"] !== undefined) qp["pageSize"] = params["page_size"];
-          if (params["offset"] !== undefined) qp["offset"] = params["offset"];
-          if (params["view"] !== undefined) qp["view"] = params["view"];
-          if (params["filter_by_formula"] !== undefined)
-            qp["filterByFormula"] = params["filter_by_formula"];
-          if (params["cell_format"] !== undefined) qp["cellFormat"] = params["cell_format"];
-          if (params["time_zone"] !== undefined) qp["timeZone"] = params["time_zone"];
-          if (params["user_locale"] !== undefined) qp["userLocale"] = params["user_locale"];
-          const fields = params["fields"] as string[] | undefined;
-          if (fields !== undefined) {
-            fields.forEach((f, i) => {
-              qp[`fields[${i}]`] = f;
-            });
-          }
-          const sort = params["sort"] as Array<{ field: string; direction?: string }> | undefined;
-          if (sort !== undefined) {
-            sort.forEach((s, i) => {
-              qp[`sort[${i}][field]`] = s.field;
-              if (s.direction !== undefined) qp[`sort[${i}][direction]`] = s.direction;
-            });
-          }
-          const response = await client.get(
-            `/${str(params["base_id"])}/${str(params["table_name"])}`,
-            { params: qp }
-          );
-          return response.data as unknown;
-        } catch (error) {
-          throw new AirtableApiError(error as AxiosError);
-        }
+      handler: (params): Effect.Effect<unknown, AirtableError> => {
+        const options: ListRecordsOptions = {
+          maxRecords: params["max_records"] as number | undefined,
+          pageSize: params["page_size"] as number | undefined,
+          offset: params["offset"] as string | undefined,
+          view: params["view"] as string | undefined,
+          filterByFormula: params["filter_by_formula"] as string | undefined,
+          cellFormat: params["cell_format"] as string | undefined,
+          timeZone: params["time_zone"] as string | undefined,
+          userLocale: params["user_locale"] as string | undefined,
+          fields: params["fields"] as string[] | undefined,
+          sort: params["sort"] as SortSpec[] | undefined,
+        };
+        return client.listRecords(str(params["base_id"]), str(params["table_name"]), options);
       },
     },
     {
@@ -243,16 +178,12 @@ export function createOperationsCatalog(client: AxiosInstance): Operation[] {
         p("table_name", "string", true, "Table name or ID"),
         p("record_id", "string", true, "ID of the record to retrieve"),
       ],
-      handler: async (params): Promise<unknown> => {
-        try {
-          const response = await client.get(
-            `/${str(params["base_id"])}/${str(params["table_name"])}/${str(params["record_id"])}`
-          );
-          return response.data as unknown;
-        } catch (error) {
-          throw new AirtableApiError(error as AxiosError);
-        }
-      },
+      handler: (params) =>
+        client.getRecord(
+          str(params["base_id"]),
+          str(params["table_name"]),
+          str(params["record_id"])
+        ),
     },
     {
       name: "create_record",
@@ -263,17 +194,11 @@ export function createOperationsCatalog(client: AxiosInstance): Operation[] {
         p("fields", "object", true, "Field values for the new record"),
         p("typecast", "boolean", false, "Convert string values to appropriate types"),
       ],
-      handler: async (params): Promise<unknown> => {
-        try {
-          const response = await client.post(
-            `/${str(params["base_id"])}/${str(params["table_name"])}`,
-            { fields: params["fields"], typecast: params["typecast"] }
-          );
-          return response.data as unknown;
-        } catch (error) {
-          throw new AirtableApiError(error as AxiosError);
-        }
-      },
+      handler: (params) =>
+        client.createRecord(str(params["base_id"]), str(params["table_name"]), {
+          fields: params["fields"],
+          typecast: params["typecast"],
+        }),
     },
     {
       name: "update_record",
@@ -285,17 +210,13 @@ export function createOperationsCatalog(client: AxiosInstance): Operation[] {
         p("fields", "object", true, "Field values to update"),
         p("typecast", "boolean", false, "Convert string values to appropriate types"),
       ],
-      handler: async (params): Promise<unknown> => {
-        try {
-          const response = await client.patch(
-            `/${str(params["base_id"])}/${str(params["table_name"])}/${str(params["record_id"])}`,
-            { fields: params["fields"], typecast: params["typecast"] }
-          );
-          return response.data as unknown;
-        } catch (error) {
-          throw new AirtableApiError(error as AxiosError);
-        }
-      },
+      handler: (params) =>
+        client.updateRecord(
+          str(params["base_id"]),
+          str(params["table_name"]),
+          str(params["record_id"]),
+          { fields: params["fields"], typecast: params["typecast"] }
+        ),
     },
     {
       name: "delete_record",
@@ -305,16 +226,12 @@ export function createOperationsCatalog(client: AxiosInstance): Operation[] {
         p("table_name", "string", true, "Table name or ID"),
         p("record_id", "string", true, "ID of the record to delete"),
       ],
-      handler: async (params): Promise<unknown> => {
-        try {
-          const response = await client.delete(
-            `/${str(params["base_id"])}/${str(params["table_name"])}/${str(params["record_id"])}`
-          );
-          return response.data as unknown;
-        } catch (error) {
-          throw new AirtableApiError(error as AxiosError);
-        }
-      },
+      handler: (params) =>
+        client.deleteRecord(
+          str(params["base_id"]),
+          str(params["table_name"]),
+          str(params["record_id"])
+        ),
     },
     {
       name: "search_records",
@@ -325,18 +242,12 @@ export function createOperationsCatalog(client: AxiosInstance): Operation[] {
         p("field_name", "string", true, "Name of the field to search in"),
         p("value", "string", true, "Value to search for"),
       ],
-      handler: async (params): Promise<unknown> => {
-        try {
-          const filterByFormula = `{${str(params["field_name"])}} = "${str(params["value"])}"`;
-          const response = await client.get(
-            `/${str(params["base_id"])}/${str(params["table_name"])}`,
-            { params: { filterByFormula } }
-          );
-          return response.data as unknown;
-        } catch (error) {
-          throw new AirtableApiError(error as AxiosError);
-        }
-      },
+      handler: (params) =>
+        client.searchRecords(
+          str(params["base_id"]),
+          str(params["table_name"]),
+          `{${str(params["field_name"])}} = "${str(params["value"])}"`
+        ),
     },
     {
       name: "create_records",
@@ -347,17 +258,11 @@ export function createOperationsCatalog(client: AxiosInstance): Operation[] {
         p("records", "array", true, "Records to create (1–10), each with a fields object"),
         p("typecast", "boolean", false, "Convert string values to appropriate types"),
       ],
-      handler: async (params): Promise<unknown> => {
-        try {
-          const response = await client.post(
-            `/${str(params["base_id"])}/${str(params["table_name"])}`,
-            { records: params["records"], typecast: params["typecast"] }
-          );
-          return response.data as unknown;
-        } catch (error) {
-          throw new AirtableApiError(error as AxiosError);
-        }
-      },
+      handler: (params) =>
+        client.createRecords(str(params["base_id"]), str(params["table_name"]), {
+          records: params["records"],
+          typecast: params["typecast"],
+        }),
     },
     {
       name: "update_records",
@@ -374,26 +279,18 @@ export function createOperationsCatalog(client: AxiosInstance): Operation[] {
           "If provided, performs upsert. Must include fields_to_merge_on array."
         ),
       ],
-      handler: async (params): Promise<unknown> => {
-        try {
-          const body: Record<string, unknown> = {
-            records: params["records"],
-            typecast: params["typecast"],
-          };
-          const performUpsert = params["perform_upsert"] as
-            | { fields_to_merge_on: string[] }
-            | undefined;
-          if (performUpsert !== undefined) {
-            body["performUpsert"] = { fieldsToMergeOn: performUpsert.fields_to_merge_on };
-          }
-          const response = await client.patch(
-            `/${str(params["base_id"])}/${str(params["table_name"])}`,
-            body
-          );
-          return response.data as unknown;
-        } catch (error) {
-          throw new AirtableApiError(error as AxiosError);
+      handler: (params): Effect.Effect<unknown, AirtableError> => {
+        const body: Record<string, unknown> = {
+          records: params["records"],
+          typecast: params["typecast"],
+        };
+        const performUpsert = params["perform_upsert"] as
+          | { fields_to_merge_on: string[] }
+          | undefined;
+        if (performUpsert !== undefined) {
+          body["performUpsert"] = { fieldsToMergeOn: performUpsert.fields_to_merge_on };
         }
+        return client.updateRecords(str(params["base_id"]), str(params["table_name"]), body);
       },
     },
     {
@@ -404,22 +301,12 @@ export function createOperationsCatalog(client: AxiosInstance): Operation[] {
         p("table_name", "string", true, "Table name or ID"),
         p("record_ids", "array", true, "IDs of records to delete (1–10)"),
       ],
-      handler: async (params): Promise<unknown> => {
-        try {
-          const recordIds = params["record_ids"] as string[];
-          const qp: Record<string, string> = {};
-          recordIds.forEach((id, i) => {
-            qp[`records[${i}]`] = id;
-          });
-          const response = await client.delete(
-            `/${str(params["base_id"])}/${str(params["table_name"])}`,
-            { params: qp }
-          );
-          return response.data as unknown;
-        } catch (error) {
-          throw new AirtableApiError(error as AxiosError);
-        }
-      },
+      handler: (params) =>
+        client.deleteRecords(
+          str(params["base_id"]),
+          str(params["table_name"]),
+          params["record_ids"] as string[]
+        ),
     },
   ];
 }

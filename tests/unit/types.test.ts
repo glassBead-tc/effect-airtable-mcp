@@ -77,7 +77,18 @@ describe("Field Types", () => {
 
     // This test ensures our FieldType union includes all expected types
     validFieldTypes.forEach((fieldType) => {
-      expect(["singleLineText", "multilineText", "number", "singleSelect", "multiSelect", "date", "checkbox", "email", "phoneNumber", "currency"]).toContain(fieldType);
+      expect([
+        "singleLineText",
+        "multilineText",
+        "number",
+        "singleSelect",
+        "multiSelect",
+        "date",
+        "checkbox",
+        "email",
+        "phoneNumber",
+        "currency",
+      ]).toContain(fieldType);
     });
   });
 });

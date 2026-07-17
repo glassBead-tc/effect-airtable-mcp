@@ -1,9 +1,36 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { Cause, Effect, type ConfigError, type ManagedRuntime } from "effect";
 import { z } from "zod";
+import type { AirtableClient } from "../airtable-client.js";
+import type { AirtableError } from "../errors.js";
 import { type Operation, searchCatalog } from "./operations.js";
-import { executeSandbox } from "./sandbox.js";
+import { executeSandbox, type CallToolFn } from "./sandbox.js";
 
-export function registerCodeModeTools(server: McpServer, catalog: Operation[]): void {
+export type AppRuntime = ManagedRuntime.ManagedRuntime<AirtableClient, ConfigError.ConfigError>;
+
+function errorResult(text: string): {
+  isError: true;
+  content: Array<{ type: "text"; text: string }>;
+} {
+  return { isError: true, content: [{ type: "text", text }] };
+}
+
+function renderAirtableError(error: AirtableError): string {
+  if (error._tag === "RateLimitError") {
+    return `Rate limited by Airtable; retries exhausted (Retry-After: ${error.retryAfterSeconds}s)`;
+  }
+  const status =
+    error.statusCode !== undefined && !error.message.includes(`HTTP ${error.statusCode}`)
+      ? ` (HTTP ${error.statusCode})`
+      : "";
+  return `${error.message}${status}`;
+}
+
+export function registerCodeModeTools(
+  server: McpServer,
+  catalog: Operation[],
+  runtime: AppRuntime
+): void {
   // SEARCH TOOL
   server.tool(
     "search",
@@ -50,20 +77,36 @@ return tables.tables.map(t => t.name);`,
         .describe("Async JavaScript code. Use await callTool(name, params) and return the result."),
     },
     async ({ code }) => {
-      const callTool = async (name: string, params: Record<string, unknown>): Promise<unknown> => {
+      const callTool: CallToolFn = (name, params, signal) => {
         const handler = dispatch.get(name);
         if (!handler) {
-          throw new Error(
-            `Unknown operation: "${name}". Use the search tool to find available operations.`
+          return Promise.reject(
+            new Error(
+              `Unknown operation: "${name}". Use the search tool to find available operations.`
+            )
           );
         }
-        return handler(params);
+        // Sandbox code must see plain, catchable JS Errors — not FiberFailure wrappers.
+        return runtime.runPromise(
+          handler(params).pipe(Effect.mapError((e) => new Error(renderAirtableError(e)))),
+          signal !== undefined ? { signal } : undefined
+        );
       };
 
-      const result = await executeSandbox(code, callTool);
-      return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-      };
+      const program = executeSandbox(code, callTool).pipe(
+        Effect.map((result) => ({
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        })),
+        Effect.catchTags({
+          SandboxError: (e) => Effect.succeed(errorResult(`Code execution failed: ${e.message}`)),
+          TimeoutException: () => Effect.succeed(errorResult("Execution timed out")),
+        }),
+        Effect.catchAllCause((cause) =>
+          Effect.succeed(errorResult(`Unexpected failure:\n${Cause.pretty(cause)}`))
+        )
+      );
+
+      return runtime.runPromise(program);
     }
   );
 }

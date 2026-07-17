@@ -13,6 +13,7 @@ This server leverages the Effect library to provide:
 - **Reliability**: Contract-driven design catches API changes at validation boundaries
 
 Unlike traditional implementations, this server features:
+
 - **Staged Table Creation**: Builds complex tables incrementally to minimize API failures
 - **Schema Validation**: Zod schemas ensure correctness at runtime
 - **Automatic Retries**: Effect-based retry logic for transient failures
@@ -33,25 +34,27 @@ Unlike traditional implementations, this server features:
 
 1. Log in to your Airtable account at [airtable.com](https://airtable.com)
 2. Create a personal access token at [Airtable's Builder Hub](https://airtable.com/create/tokens)
-3. In the Personal access token section select these scopes: 
-     - data.records:read
-     - data.records:write
-     - schema.bases:read
-     - schema.bases:write
+3. In the Personal access token section select these scopes:
+   - data.records:read
+   - data.records:write
+   - schema.bases:read
+   - schema.bases:write
 4. Select the workspace or bases you want to give access to the personal access token
 5. Keep this key secure - you'll need it for configuration
 
 ## Installation
 
 ### Method 1: Using npx (Recommended)
+
 1. Navigate to the Claude configuration directory:
 
    - Windows: `C:\Users\NAME\AppData\Roaming\Claude`
    - macOS: `~/Library/Application Support/Claude/`
-   
+
    You can also find these directories inside the Claude Desktop app: Claude Desktop > Settings > Developer > Edit Config
 
 2. Create or edit `claude_desktop_config.json`:
+
 ```json
 {
   "mcpServers": {
@@ -65,10 +68,13 @@ Unlike traditional implementations, this server features:
   }
 }
 ```
+
 Note: For Windows paths, use double backslashes (\\) or forward slashes (/).
 
 ### Method 2: Local Development Installation
+
 If you want to contribute or modify the code:
+
 ```bash
 # Clone the repository
 git clone https://github.com/glassBead-tc/effect-airtable-mcp.git
@@ -86,7 +92,9 @@ npm test
 # Run locally
 node build/index.js
 ```
+
 Then modify the Claude Desktop configuration file to use the local installation:
+
 ```json
 {
   "mcpServers": {
@@ -106,6 +114,7 @@ Then modify the Claude Desktop configuration file to use the local installation:
 1. Start Claude Desktop
 2. The Airtable MCP server should be listed in the "Connected MCP Servers" section
 3. Test with a simple command:
+
 ```
 List all bases
 ```
@@ -143,21 +152,65 @@ ToolExecutor {
 
 See [`src/docs/effect-architecture.md`](src/docs/effect-architecture.md) for detailed documentation.
 
+## Claude Code Channel
+
+The server ships a second entrypoint, `src/channel/server.ts`, that turns it into a [Claude Code Channel](https://docs.claude.com/en/docs/claude-code): a stdio MCP server that pushes events into a live Claude Code session via `notifications/claude/channel`, so Claude can react to things happening outside the terminal with full codebase context. It exposes the same Code Mode tools (`search` + `execute`), so Claude can act on Airtable the moment an event arrives.
+
+Events come from two sources:
+
+1. **Local HTTP receiver** — anything that can reach localhost can push an event:
+
+   ```bash
+   curl -X POST http://127.0.0.1:3031/event \
+     -H 'Content-Type: application/json' \
+     -d '{"content": "CI build failed on main", "meta": {"severity": "high"}}'
+   ```
+
+   Claude receives it as `<channel source="airtable-effect-channel" origin="http" severity="high">CI build failed on main</channel>`.
+
+2. **Airtable webhook poller** (optional) — set `AIRTABLE_WEBHOOK_BASE_ID` and `AIRTABLE_WEBHOOK_ID` and the channel polls the [webhook payloads endpoint](https://airtable.com/developers/web/api/list-webhook-payloads) for record/table changes. No public URL or tunnel needed — create the webhook without a `notificationUrl` and the poller drains its payloads (and refreshes it every 6 hours so it doesn't expire).
+
+### Setup
+
+Requires Claude Code v2.1.80+ with claude.ai login. The channel is already registered in `.mcp.json` as `airtable-effect-channel`; launch Claude Code with:
+
+```bash
+claude --channels --dangerously-load-development-channels airtable-effect-channel
+```
+
+(The `--dangerously-load-development-channels` flag is needed during the research preview, when custom channels aren't on the approved allowlist.)
+
+### Configuration
+
+| Variable                        | Default      | Purpose                                                        |
+| ------------------------------- | ------------ | -------------------------------------------------------------- |
+| `AIRTABLE_API_KEY`              | — (required) | Same key the main server uses                                  |
+| `CHANNEL_HTTP_PORT`             | `3031`       | Port for the local event receiver (binds 127.0.0.1 only)       |
+| `CHANNEL_HTTP_TOKEN`            | unset        | If set, `POST /event` requires `Authorization: Bearer <token>` |
+| `AIRTABLE_WEBHOOK_BASE_ID`      | unset        | Base to poll webhook payloads from                             |
+| `AIRTABLE_WEBHOOK_ID`           | unset        | Webhook to poll (`ach...`)                                     |
+| `AIRTABLE_WEBHOOK_POLL_SECONDS` | `15`         | Poll interval                                                  |
+
+The channel is one-way: there is no reply tool. Claude responds by acting — querying or mutating Airtable through `execute`, or editing the working directory.
+
 ## Features
 
 ### Available Operations
 
 #### Base Management
+
 - `list_bases`: List all accessible Airtable bases
 - `list_tables`: List all tables in a base
 - `create_table`: Create a new table with fields
 - `update_table`: Update a table's name or description
 
 #### Field Management
+
 - `create_field`: Add a new field to a table
 - `update_field`: Modify an existing field
 
 #### Record Operations
+
 - `list_records`: Retrieve records from a table
 - `create_record`: Add a new record
 - `update_record`: Modify an existing record
@@ -166,6 +219,7 @@ See [`src/docs/effect-architecture.md`](src/docs/effect-architecture.md) for det
 - `get_record`: Get a single record by its ID
 
 ### Field Types
+
 - `singleLineText`: Single line text field
 - `multilineText`: Multi-line text area
 - `email`: Email address field
@@ -177,7 +231,9 @@ See [`src/docs/effect-architecture.md`](src/docs/effect-architecture.md) for det
 - `multiSelect`: Multiple choices from options
 
 ### Field Colors
+
 Available colors for select fields:
+
 - `blueBright`, `redBright`, `greenBright`
 - `yellowBright`, `purpleBright`, `pinkBright`
 - `grayBright`, `cyanBright`, `orangeBright`
@@ -190,6 +246,7 @@ We welcome contributions to improve the Effect Airtable MCP server!
 ### Quick Start
 
 1. Fork and clone:
+
    ```bash
    git clone https://github.com/your-username/effect-airtable-mcp.git
    cd effect-airtable-mcp
@@ -197,6 +254,7 @@ We welcome contributions to improve the Effect Airtable MCP server!
    ```
 
 2. Create a feature branch:
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
@@ -204,6 +262,7 @@ We welcome contributions to improve the Effect Airtable MCP server!
 3. Make your changes following Effect patterns (see `src/docs/effect-architecture.md`)
 
 4. Run tests and linting:
+
    ```bash
    npm test
    npm run lint
@@ -211,6 +270,7 @@ We welcome contributions to improve the Effect Airtable MCP server!
    ```
 
 5. Commit and push:
+
    ```bash
    git add .
    git commit -m "feat: add your feature description"
@@ -235,6 +295,7 @@ We welcome contributions to improve the Effect Airtable MCP server!
 - Ask questions in pull requests
 
 Your contributions help make this tool better for everyone. Whether it's:
+
 - Adding new features
 - Fixing bugs
 - Improving documentation

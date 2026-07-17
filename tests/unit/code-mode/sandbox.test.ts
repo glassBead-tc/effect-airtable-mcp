@@ -1,19 +1,33 @@
 import { describe, it, expect, vi } from "vitest";
-import { executeSandbox } from "../../../src/code-mode/sandbox.js";
+import { Effect } from "effect";
+import { executeSandbox, type CallToolFn } from "../../../src/code-mode/sandbox.js";
+
+const run = (
+  code: string,
+  callTool: CallToolFn,
+  options?: Parameters<typeof executeSandbox>[2]
+): Promise<unknown> => Effect.runPromise(executeSandbox(code, callTool, options));
+
+const runError = (
+  code: string,
+  callTool: CallToolFn,
+  options?: Parameters<typeof executeSandbox>[2]
+): Promise<{ _tag: string; message?: string }> =>
+  Effect.runPromise(Effect.flip(executeSandbox(code, callTool, options)));
 
 describe("sandbox", () => {
   it("should execute simple code and return result", async () => {
     const callTool = vi.fn().mockResolvedValue({ id: "rec123" });
-    const result = await executeSandbox(
+    const result = await run(
       'return await callTool("get_record", { base_id: "app1", table_name: "t", record_id: "rec123" });',
       callTool
     );
     expect(result).toEqual({ id: "rec123" });
-    expect(callTool).toHaveBeenCalledWith("get_record", {
-      base_id: "app1",
-      table_name: "t",
-      record_id: "rec123",
-    });
+    expect(callTool).toHaveBeenCalledWith(
+      "get_record",
+      { base_id: "app1", table_name: "t", record_id: "rec123" },
+      expect.any(AbortSignal)
+    );
   });
 
   it("should support multi-step orchestration", async () => {
@@ -26,33 +40,42 @@ describe("sandbox", () => {
       const tables = await callTool("list_tables", { base_id: bases.bases[0].id });
       return tables;
     `;
-    const result = await executeSandbox(code, callTool);
+    const result = await run(code, callTool);
     expect(result).toEqual({ tables: [{ id: "tbl1", name: "Tasks" }] });
     expect(callTool).toHaveBeenCalledTimes(2);
   });
 
-  it("should timeout on long-running code", async () => {
+  it("should timeout on synchronous infinite loops", async () => {
     const callTool = vi.fn();
-    await expect(executeSandbox("while(true) {}", callTool, { timeoutMs: 200 })).rejects.toThrow();
+    const error = await runError("while(true) {}", callTool, { syncTimeoutMs: 200 });
+    expect(error._tag).toBe("SandboxError");
+  });
+
+  it("should timeout on async code that never settles", async () => {
+    const callTool: CallToolFn = () => new Promise(() => undefined);
+    const error = await runError('return await callTool("list_bases", {});', callTool, {
+      totalTimeoutMs: 200,
+    });
+    expect(error._tag).toBe("TimeoutException");
   });
 
   it("should not expose Node.js globals", async () => {
     const callTool = vi.fn();
-    const result = await executeSandbox("return typeof require", callTool);
+    const result = await run("return typeof require", callTool);
     expect(result).toBe("undefined");
   });
 
   it("should not expose process", async () => {
     const callTool = vi.fn();
-    const result = await executeSandbox("return typeof process", callTool);
+    const result = await run("return typeof process", callTool);
     expect(result).toBe("undefined");
   });
 
-  it("should propagate callTool errors", async () => {
+  it("should propagate callTool errors as SandboxError", async () => {
     const callTool = vi.fn().mockRejectedValue(new Error("API failed"));
-    await expect(
-      executeSandbox('return await callTool("list_bases", {});', callTool)
-    ).rejects.toThrow("API failed");
+    const error = await runError('return await callTool("list_bases", {});', callTool);
+    expect(error._tag).toBe("SandboxError");
+    expect(error.message).toContain("API failed");
   });
 
   it("should allow data transformation with built-ins", async () => {
@@ -66,7 +89,7 @@ describe("sandbox", () => {
       const data = await callTool("list_records", { base_id: "app1", table_name: "People" });
       return data.records.map(r => r.fields.Name);
     `;
-    const result = await executeSandbox(code, callTool);
+    const result = await run(code, callTool);
     expect(result).toEqual(["Alice", "Bob"]);
   });
 });
