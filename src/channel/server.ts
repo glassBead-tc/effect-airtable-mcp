@@ -27,8 +27,8 @@ import { ManagedRuntime } from "effect";
 import { AirtableClient } from "../airtable-client.js";
 import { createOperationsCatalog } from "../code-mode/operations.js";
 import { registerAllTools } from "../tools/index.js";
-import { startHttpReceiver } from "./http-receiver.js";
 import { createFileCursorStore, startWebhookPoller } from "./webhook-poller.js";
+import { acquireReceiver } from "./takeover.js";
 import type { ChannelLog, PushEvent } from "./types.js";
 
 const CHANNEL_NAME = "airtable-effect-channel";
@@ -84,24 +84,17 @@ async function main(): Promise<void> {
     });
   };
 
-  // The receiver is a secondary event source — if it cannot start (typically
-  // EADDRINUSE from a stale channel instance still holding the port), keep the
-  // stdio channel and the webhook poller alive rather than dying with an
-  // opaque connection error.
-  let httpServer: Server | undefined;
-  try {
-    httpServer = await startHttpReceiver({ port: HTTP_PORT, token: HTTP_TOKEN }, push, log);
+  // The receiver is a secondary event source — a stale sibling holding the
+  // port gets evicted (newest wins), and any unrecoverable failure leaves the
+  // stdio channel and webhook poller running rather than dying with an opaque
+  // connection error. acquireReceiver logs every failure path.
+  const httpServer: Server | undefined = await acquireReceiver(
+    { port: HTTP_PORT, token: HTTP_TOKEN },
+    push,
+    log
+  );
+  if (httpServer !== undefined) {
     log(`event receiver listening on http://127.0.0.1:${HTTP_PORT}/event`);
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    const detail =
-      code === "EADDRINUSE"
-        ? `port ${HTTP_PORT} is already in use — likely a stale channel instance ` +
-          `(lsof -iTCP:${HTTP_PORT} -sTCP:LISTEN to find it; kill it and reconnect to restore the receiver)`
-        : error instanceof Error
-          ? error.message
-          : String(error);
-    log(`HTTP event receiver disabled: ${detail}. Webhook polling is unaffected.`);
   }
 
   let poller: { stop: () => void } | undefined;
@@ -129,7 +122,14 @@ async function main(): Promise<void> {
     );
   }
 
+  let shuttingDown = false;
   const shutdown = (): void => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    // Failsafe: registering signal handlers suppresses default die-on-signal
+    // behavior, so a hung close/dispose would otherwise leave a zombie holding
+    // the receiver port. Shutdown must always terminate the process.
+    setTimeout(() => process.exit(1), 3000).unref();
     poller?.stop();
     const disposeAndExit = (): void => {
       runtime.dispose().then(
@@ -138,6 +138,8 @@ async function main(): Promise<void> {
       );
     };
     if (httpServer !== undefined) {
+      // Keep-alive sockets would stall close()'s callback indefinitely.
+      httpServer.closeAllConnections();
       httpServer.close(disposeAndExit);
     } else {
       disposeAndExit();
@@ -146,7 +148,23 @@ async function main(): Promise<void> {
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
   // Claude Code closing the session closes our stdin — shut down with it.
+  // transport.onclose alone is NOT enough: the SDK's StdioServerTransport only
+  // listens for 'data'/'error' and fires onclose on explicit close(), so a
+  // plain stdin EOF is silent. Without this handler an abandoned instance
+  // lingers forever with the receiver port held (observed 2026-07-17).
   transport.onclose = shutdown;
+  process.stdin.on("end", () => {
+    log("stdin closed — shutting down");
+    shutdown();
+  });
+  // Stdin EOF only fires if the parent actually closes the pipe; a crashed
+  // parent reparents us to pid 1. Poll for that and exit rather than linger.
+  setInterval(() => {
+    if (process.ppid === 1) {
+      log("parent process is gone — shutting down");
+      shutdown();
+    }
+  }, 5000).unref();
 }
 
 main().catch((error: unknown) => {

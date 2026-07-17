@@ -2,6 +2,9 @@ import express from "express";
 import type { Server } from "node:http";
 import type { ChannelLog, PushEvent } from "./types.js";
 
+/** Identity reported by GET /health — takeover uses it to recognize a sibling. */
+export const RECEIVER_SERVER_NAME = "airtable-effect-channel";
+
 export interface HttpReceiverConfig {
   port: number;
   /** When set, POST /event requires `Authorization: Bearer <token>`. */
@@ -60,7 +63,7 @@ export function startHttpReceiver(
   });
 
   app.get("/health", (_req, res) => {
-    res.json({ status: "ok", server: "airtable-effect-channel" });
+    res.json({ status: "ok", server: RECEIVER_SERVER_NAME, pid: process.pid });
   });
 
   return new Promise((resolve, reject) => {
